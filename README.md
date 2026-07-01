@@ -1,2 +1,2 @@
 # Survey-Weighting
-Code for generating and validating survey weights.
+R Code for generating and validating survey weights.
