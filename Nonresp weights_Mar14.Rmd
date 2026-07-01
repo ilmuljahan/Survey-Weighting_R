@@ -1,0 +1,1471 @@
+---
+title: "CHOP weights-13 unique strata"
+author: "Ilmul Jahan Tani"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+library(readxl)
+library(DataExplorer)
+library(tidyverse)
+library(MASS)
+library(gtsummary)
+library(ggplot2)
+library(dplyr)
+library(car)
+library(AUC)
+library(pROC)
+library(DescTools)
+library(labelled)
+library(knitr)
+library(flextable)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+dat <- read_excel("C:/Users/ilmul/Documents/UMICH/RA works/CHOP Nonresponse weights Winter 2024/Response_outcomes_EDtelehealthR56_2023.12.27.xlsx")
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#Creating a dataframe with only the RESPONDERS (Response indicator = Yes)
+datA <- dat %>% 
+  filter(Response_indicator == 1)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+summary(dat)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#selecting variables
+dat2 <- dat %>% 
+          dplyr::select(-rural_status, -discharge, -risk_assessment, -sb_plan)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#converting the variables to factor
+dat2$stratum_5_categories <- as.factor(dat2$stratum_5_categories)
+dat2$ed_volume_category <- as.factor(dat2$ed_volume_category)
+dat2$hospital_ownership <- as.factor(dat2$hospital_ownership)
+dat2$psyemhos <- as.factor(dat2$psyemhos)
+dat2$mapp18 <- as.factor(dat2$mapp18)
+dat2$teach_hosp <- as.factor(dat2$teach_hosp)
+dat2$Response_indicator <- as.factor(dat2$Response_indicator)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#handling missing data
+dat2$psyemhos2 <- ifelse(dat$psyemhos %in% c(1:2), dat$psyemhos, NA)
+
+#dat2$psyemhos2 <- ifelse(dat2$psyemhos %in% c(1:2), dat2$psyemhos, "Unknown") # recoding missing to unknown
+dat2$psyemhos2 <- as.factor(dat2$psyemhos2) # converting to factor
+
+dat$mapp18 <- ifelse(dat$mapp18 %in% c(1:2), dat$mapp18, NA)
+
+dat$teach_hosp <- ifelse(dat$teach_hosp %in% c(1:2), dat$teach_hosp, NA)
+
+
+
+#selecting the final variables
+dat3 <- dat2 %>% 
+          dplyr::select(-psyemhos)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+table(dat3$ed_volume_category)
+
+dat3$ed_volume_category2 <- car::Recode(dat3$ed_volume_category, recodes="1='small'; 2='medium'; 3='large'; else=NA",
+                      levels = c('small', 'medium', 'large'), as.factor=T)
+
+table(dat3$ed_volume_category2)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+table(dat3$hospital_ownership)
+
+dat3$hospital_ownership2 <- car::Recode(dat3$hospital_ownership, recodes = "12='State'; 13='County'; 14='City'; 15='City-county'; 16='Hospital district or authority'; 21='Church-operated'; 23='Other not-for-profit'; 31='Individual investor-owned'; 32='Partnership investor owned'; 33='Corporation'; else=NA",
+                      levels = c('State', 'County', 'City', 'City-county', 'Hospital district or authority', 'Church-operated', 'Other not-for-profit', 'Individual investor-owned', 'Partnership investor owned', 'Corporation'), as.factor=T)
+
+table(dat3$hospital_ownership2)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+table(dat3$mapp18)
+
+dat3$mapp182 <- car::Recode(dat3$mapp18, recodes = "1='Yes'; 2='No'; else=NA",
+                      levels = c('Yes', 'No'), as.factor=T)
+
+table(dat3$mapp182)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+table(dat3$teach_hosp)
+
+dat3$teach_hosp2 <- car::Recode(dat3$teach_hosp, recodes = "1='Yes'; 2='No';  else=NA",
+                      levels = c('Yes', 'No'), as.factor=T)
+
+table(dat3$teach_hosp2)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+table(dat3$psyemhos2)
+
+dat3$psyemhos2a <- car::Recode(dat3$psyemhos2, recodes = "1='Yes'; 2='No'; NA='Unknown'; else=NA",
+                      levels = c('Yes', 'No', 'Unknown'), as.factor=T)
+
+table(dat3$psyemhos2a)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+table(dat3$Response_indicator)
+
+dat3$Response_indicator2 <- car::Recode(dat3$Response_indicator, recodes = "0='No'; 1='Yes'; else=NA",
+                      levels = c('No', 'Yes'), as.factor=T)
+
+table(dat3$Response_indicator2)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+dat4 <- dat3 %>% 
+          dplyr::select(sample_id, aha_id, stratum_5_categories, ed_volume_category2, total_hospital_beds, hospital_ownership2, mapp182, psyemhos2a, teach_hosp2, Response_indicator2)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+summary(dat4)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod1 <- glm(Response_indicator2 ~ factor(stratum_5_categories), data = dat4, family = 'binomial')
+
+summary(mod1)
+# 3 Stratum categories are Significant
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod2 <- glm(Response_indicator2 ~ factor(ed_volume_category2), data = dat4, family = 'binomial')
+
+summary(mod2)
+#All levels are significant
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod3 <- glm(Response_indicator2 ~ total_hospital_beds, data = dat4, family = 'binomial')
+
+summary(mod3)
+#significant
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod4 <- glm(Response_indicator2 ~ factor(hospital_ownership2), data = dat4, family = 'binomial')
+
+summary(mod4)
+#None are significant
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod5 <- glm(Response_indicator2 ~ factor(psyemhos2a), data = dat4, family = 'binomial')
+
+summary(mod5)
+#Not significant
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod6 <- glm(Response_indicator2 ~ factor(mapp182), data = dat4, family = 'binomial')
+
+summary(mod6)
+# Level 2 (Yes) is Significant
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod7 <- glm(Response_indicator2 ~ factor(teach_hosp2), data = dat4, family = 'binomial')
+
+summary(mod7)
+#not significant
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod_full <- glm(Response_indicator2 ~ factor(stratum_5_categories) + factor(ed_volume_category2) + total_hospital_beds + factor(hospital_ownership2) + factor(psyemhos2a) + factor(mapp182) + factor(teach_hosp2), data = dat4, family = 'binomial')
+
+summary(mod_full)
+
+#Stratum Northeast non-rural, West non-rural are significant
+#ED_volume category3 (large) is marginally significant 
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#model with significant results only
+mod_full_sig <- glm(Response_indicator2 ~ factor(stratum_5_categories) + factor(ed_volume_category2), data = dat4, family = 'binomial')
+
+summary(mod_full_sig)
+#Two of the levels of stratum variable are not significant
+##All Ed_volume cat are significant
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#model with significant results and mapp18
+mod_full_map <- glm(Response_indicator2 ~ factor(stratum_5_categories) + factor(ed_volume_category2) + factor(mapp182), data = dat4, family = 'binomial')
+
+summary(mod_full_map)
+#Some of the levels of stratum variable are significant
+#Ed volume is marginally significant
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+# **Classification tree**
+library(foreign)
+library(partykit)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+resp.tree <- ctree(factor(Response_indicator2) ~ factor(stratum_5_categories) + factor(ed_volume_category2) + total_hospital_beds + factor(hospital_ownership2) + factor(psyemhos2a) + factor(mapp182) + factor(teach_hosp2), data = dat4)
+
+print(resp.tree)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+n.control <- ctree_control(minsplit=100, minbucket=100)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE, fig.show='hide'}
+resp.tree <- ctree(factor(Response_indicator2) ~ factor(stratum_5_categories) + factor(ed_volume_category2) + total_hospital_beds + factor(hospital_ownership2) + factor(psyemhos2a) + factor(mapp182) + factor(teach_hosp2), data = dat4, control = n.control)
+
+print(resp.tree)
+plot(resp.tree)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE, fig.show='hide'}
+set.seed(2024)
+smp_size = floor(0.8 * nrow(dat4))
+train_ind = sample(seq_len(nrow(dat4)), size = smp_size)
+train = dat4[train_ind, ]
+val = dat4[-train_ind, ] 
+val = val[complete.cases(val), ]
+
+ttree <- ctree(factor(Response_indicator2) ~ factor(stratum_5_categories) + factor(ed_volume_category2) + total_hospital_beds + factor(hospital_ownership2) + factor(psyemhos2a) + factor(mapp182) + factor(teach_hosp2), data = train)
+
+print(ttree)
+plot(ttree)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+library(crossval)
+
+val$pred <- predict(ttree, val[, -which(names(val) =="Response_indicator2")]) # taking out DV
+
+cm <- confusionMatrix(factor(val$Response_indicator2), factor(val$pred), negative="0")
+cm
+
+diagnosticErrors(cm)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE, fig.show='hide'}
+#*Comparing AUC values of the classification tree and an interim logistic model**
+
+#with full model
+dat4$phat <- predict(mod_full, dat4, type = "response")
+roc <- roc(factor(dat4$Response_indicator2), dat4$phat, plot=TRUE, auc.print=TRUE)
+
+PseudoR2(mod_full, which="all")
+
+#with model with significant only
+dat4$phat1 <- predict(mod_full_sig, dat4, type = "response")
+roc1 <- roc(factor(dat4$Response_indicator2), dat4$phat1, plot=TRUE, auc.print=TRUE)
+roc1
+
+auc(roc1)
+
+PseudoR2(mod_full_sig, which="all")
+
+#with model having significant results and mapp18
+dat4$phat2 <- predict(mod_full_map, dat4, type = "response")
+roc2 <- roc(factor(dat4$Response_indicator2), dat4$phat2, plot=TRUE, auc.print=TRUE)
+
+PseudoR2(mod_full_map, which="all")
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE, fig.show='hide'}
+#trying a different way to plot AUC with value
+# library(ROCR)
+# 
+# # Create prediction object
+# m1.prediction <- prediction(dat4$phat, dat4$Response_indicator2)
+# 
+# # Calculate AUC value
+# m1.auc <- performance(m1.prediction, "auc")@y.values[[1]]
+# m1.auc
+# 
+# # Plot ROC curve
+# m1.perf <- performance(m1.prediction, "tpr", "fpr")
+# plot(m1.perf, main = "ROC Curve", col = "blue", lwd = 2)
+# abline(a = 0, b = 1, lty = 2, lwd = 2)
+# legend("bottomright", legend = paste("AUC = ", round(m1.auc, 2)), col = "blue", lwd = 2, bty = "n")
+```
+
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#**Comparing AUC values for ctree with mapp18 only and model with significant predictors only
+
+#Fitting the ctree model using only "mapp18" as the predictor
+resp.tree1 <- ctree(factor(Response_indicator2) ~ factor(mapp182), data = dat4, control = n.control)
+resp.tree1
+
+pred_prob_ctree <- predict(resp.tree1, type = "prob")[, 2]
+pred_prob_ctree
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+roc_ctree <- roc(dat4$Response_indicator2, pred_prob_ctree)
+
+auc_ctree <- auc(roc_ctree)
+auc_ctree
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#getting auc values
+roc_final <- roc(dat4$Response_indicator2, dat4$phat1) #taking phat1 from above
+roc_final
+
+auc_final <- auc(roc1) #taking roc1 from above
+auc_final 
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#comparing the two auc values
+comparison_table <- data.frame(
+  Model = c("resp.ctree1", "mod_full_sig"),
+  AUC = c(auc_ctree, auc_final)
+)
+
+ct <- print(comparison_table)
+
+#AUC for ctree is 0.551
+#AUC for model with sig preds only is 0.592
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+kable(ct)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#comparing vif
+vif(mod_full)
+vif(mod_full_sig)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod_ed <- glm(Response_indicator2 ~ factor(stratum_5_categories) + total_hospital_beds + factor(hospital_ownership2) + factor(psyemhos2a) + factor(mapp182) + factor(teach_hosp2), data = dat4, family = 'binomial')
+
+summary(mod_ed)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+mod_ed_bed <- glm(Response_indicator2 ~ factor(stratum_5_categories) + factor(hospital_ownership2) + factor(psyemhos2a) + factor(mapp182) + factor(teach_hosp2), data = dat4, family = 'binomial')
+
+summary(mod_ed_bed)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#hospital_ownership
+tbl_cross(dat4, row = hospital_ownership2, col = Response_indicator2, percent = "row")
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+dat4 <- dat4 %>%
+  mutate(new_hosp_ownership = case_when(
+    hospital_ownership2 %in% c('City', 'City-county') ~ 'City combined',
+    hospital_ownership2 %in% c('Individual investor-owned', 'Partnership investor owned') ~ 'Investor-owned',
+    TRUE ~ hospital_ownership2
+  ))
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide',message=FALSE}
+
+#*Final logistic model
+  
+mod_new <- glm(Response_indicator2 ~ factor(stratum_5_categories) + factor(new_hosp_ownership) + factor(psyemhos2a) + factor(mapp182) + factor(teach_hosp2), data = dat4, family = 'binomial')
+
+summary(mod_new)
+```
+
+```{r}
+library(flextable)
+r <- tbl_regression(mod_new, exp = T) %>% 
+  bold_p() %>% 
+  as_flex_table()
+r
+```
+
+```{r}
+save_as_docx(r, path = "C:/Users/ilmul/Documents/UMICH/RA works/CHOP Nonresponse weights Winter 2024/final model.docx")
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+vif(mod_new)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#Goodness of fit using AIC**
+
+AIC(mod_new)
+BIC(mod_new)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#Comparing AUC values of the final model and classification tree**
+
+#Fitting the ctree model using only "mapp18" as the predictor
+resp.tree2 <- ctree(factor(Response_indicator2) ~ factor(stratum_5_categories) + factor(new_hosp_ownership) + factor(psyemhos2a) + factor(mapp182) + factor(teach_hosp2), data = dat4, control = n.control)
+resp.tree2
+
+pred_prob_ctree2 <- predict(resp.tree2, type = "prob")[, 2]
+pred_prob_ctree2
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+roc_ctree1 <- roc(dat4$Response_indicator2, pred_prob_ctree)
+
+auc_ctree1 <- auc(roc_ctree1)
+auc_ctree1
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+dat4$phat2 <- predict(mod_new, dat4, type = "response")
+#getting auc values
+roc_final2 <- roc(dat4$Response_indicator2, dat4$phat2)
+roc_final2
+
+auc_final1 <- auc(roc_final2)
+auc_final1 
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#comparing the two auc values
+comparison_table1 <- data.frame(
+  Model = c("resp.ctree2", "mod_new"),
+  AUC = c(auc_ctree1, auc_final1)
+)
+
+ct1 <- print(comparison_table1)
+
+#AUC for ctree is 0.551
+#AUC for model with sig preds only is 0.597, earlier it was 0.592
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+vif(mod_new)
+```
+
+```{r, warning=FALSE, echo=FALSE, results='hide', message=FALSE}
+#comparing the two auc values
+comparison_table2 <- data.frame(
+  Model = c("resp.ctree", "mod_new"),
+  AUC = c(auc_ctree1, auc_final1)
+)
+
+ct2 <- print(comparison_table2)
+
+#AUC for ctree is 0.551
+#AUC for model with sig preds only is 0.597, earlier it was 0.592
+```
+
+```{r, warning=FALSE, echo=FALSE,results='hide',message=FALSE}
+kable(ct2)
+```
+
+```{r}
+library(DescTools)
+PseudoR2(mod_new)
+```
+
+```{r}
+#GOF test
+library(glmtoolbox)
+hltest(mod_new)
+```
+
+
+```{r, warning=FALSE}
+#Creating 3 weight variables
+
+# Define the sampling fractions for each stratum
+sampling_fractions <- c(
+  'Midwest non-rural' = 0.288,
+  'Northeast non-rural' = 0.295,
+  'South non-rural' = 0.289,
+  'West non-rural' = 0.291,
+  'Rural Combined' = 0.287
+)
+
+# 1. Probability of selection for each respondent
+dat4$prob_selection <- sapply(dat4$stratum_5_categories, function(stratum) sampling_fractions[stratum])
+
+# 2. Expected probability of response for each respondent
+dat4$prob_response <- predict(mod_new, newdata=dat4, type = "response")
+
+# 3. Base weight for each respondent
+dat4$base_weight <- 1 / dat4$prob_selection
+
+# 4. Nonresponse weight for each respondent
+dat4$nonresponse_weight <- 1 / dat4$prob_response
+
+# 5. Raw adjusted weight for each respondent
+dat4$raw_adjusted_weight <- dat4$base_weight * dat4$nonresponse_weight
+```
+
+```{r, warning=FALSE}
+#Creating a dataframe with only the RESPONDERS (Response indicator = Yes)
+dat4x <- dat4 %>% 
+  filter(Response_indicator2 == 'Yes')
+```
+
+**Descriptives of weights for the overall database BEFORE CALIBRATION**
+```{r, warning=FALSE}
+des_overall <- dat4x %>%
+  tbl_summary(#by= "stratum_5_categories",
+    include = c(base_weight, nonresponse_weight, raw_adjusted_weight), 
+                 type = list(base_weight ~ "continuous", 
+                             nonresponse_weight ~ "continuous",
+                             raw_adjusted_weight ~ "continuous"),
+                 percent = "column",
+                 statistic = list(all_continuous() ~ "{min}, {mean}, {median}, ({p1}, {p5}, {p10}, {p90}, {p95}, {p99}), {max}",
+                            all_categorical() ~ "{p}"),
+                 digits = list(all_continuous() ~ c(1,1),
+                               all_categorical() ~ 1),
+                 missing = "no")%>%
+  modify_header(all_stat_cols() ~ "{level} ({style_percent(p)}%)") %>%
+  modify_spanning_header(starts_with("stat_") ~ "For overall") %>%
+  #add_p() %>%
+  #bold_p() %>% 
+  #add_overall() %>% 
+  bold_labels() %>% 
+  italicize_levels() %>% 
+  as_flex_table()
+
+des_overall
+```
+
+**Descriptives of weights by stratum BEFORE CALIBRATION**
+```{r, warning=FALSE, fig.width=0.2, fig.height=4}
+des_st <- dat4x %>%
+  tbl_summary(by= "stratum_5_categories",
+    include = c(base_weight, nonresponse_weight, raw_adjusted_weight), 
+                 type = list(base_weight ~ "continuous", 
+                             nonresponse_weight ~ "continuous",
+                             raw_adjusted_weight ~ "continuous"),
+                 percent = "column",
+                 statistic = list(all_continuous() ~ "{min}, {mean}, {median}, ({p1}, {p5}, {p10}, {p90}, {p95}, {p99}), {max}",
+                            all_categorical() ~ "{p}"),
+                 digits = list(all_continuous() ~ c(1,1),
+                               all_categorical() ~ 1),
+                 missing = "no")%>%
+  modify_header(all_stat_cols() ~ "{level} ({style_percent(p)}%)") %>%
+  modify_spanning_header(starts_with("stat_") ~ "By strata") %>%
+  #add_p() %>%
+  #bold_p() %>% 
+  #add_overall() %>% 
+  bold_labels() %>% 
+  italicize_levels() %>% 
+  as_flex_table()
+  #flextable::set_table_properties(width = "60%")  # Adjust the width as needed
+
+  # Adjust the width of the flextable
+des_st <- flextable::set_table_properties(des_st, width = .2)  # Adjust the width as needed
+
+des_st
+```
+
+
+**Histogram for the weights BEFORE CALIBRATION**
+```{r, warning=FALSE}
+#par(mfrow=c(1,3))
+hist(dat4x$base_weight, main="Base weight", xlab="Base weight")
+hist(dat4x$nonresponse_weight, main="Nonresponse weight", xlab="Nonresponse weight")
+hist(dat4x$raw_adjusted_weight, main="Raw adjusted weight", xlab="Raw adjusted weight")
+```
+
+
+**Boxplot for the weights BEFORE CALIBRATION**
+```{r, warning=FALSE}
+par(mfrow=c(1,3))
+boxplot(dat4x$base_weight, main="Base weight")
+Boxplot(dat4x$nonresponse_weight, main="Nonresponse weight")
+Boxplot(dat4x$raw_adjusted_weight, main="Raw adjusted weight")
+```
+
+
+**1+L for raw adjusted weight BEFORE CALIBRATION**
+
+```{r, warning=FALSE}
+#computing 1+L for overall data using raw adj weight for respondents only
+vif <- dat4x %>%
+    summarise(
+    mu = mean(raw_adjusted_weight),
+    std = sd(raw_adjusted_weight),
+    cv = std / mu,
+    var_inflation = 1 + cv^2
+  )
+
+vif
+#kable(vif, caption = "1+L for overall data")
+```
+
+```{r, warning=FALSE}
+#Grouping the data by stratum for responents only
+vif1 <- dat4x %>%
+  group_by(stratum_5_categories) %>%
+  summarise(
+    mu1 = mean(raw_adjusted_weight),
+    std1 = sd(raw_adjusted_weight),
+    cv1 = std1 / mu1,
+    var_inflation1 = 1 + cv1^2
+  )
+
+vif1
+
+#kable(vif1, caption = "1+L by stratum")
+```
+
+```{r, warning=FALSE}
+#*Post Stratification**
+library(survey)
+```
+
+```{r, warning=FALSE}
+#Creating control totals for only respondents
+
+dat5x <- dat4x %>%
+  mutate(control_totals = case_when(
+    stratum_5_categories == "Midwest non-rural" & teach_hosp2 == "Yes" & mapp182 == "Yes" ~ 'Midwest non-rural-Yes-Yes',
+    stratum_5_categories == "Northeast non-rural" & teach_hosp2 == "Yes" & mapp182 == "Yes" ~ 'Northeast non-rural-Yes-Yes',
+    stratum_5_categories == "South non-rural" & teach_hosp2 == "Yes" & mapp182 == "Yes" ~ 'South non-rural-Yes-Yes',
+    stratum_5_categories == "West non-rural" & teach_hosp2 == "Yes" & mapp182 == "Yes" ~ 'West non-rural-Yes-Yes',
+    stratum_5_categories == "Rural combined" & teach_hosp2 == "Yes" & mapp182 == "Yes" ~ 'Rural combined-Yes-Yes',
+    stratum_5_categories == "Midwest non-rural" & teach_hosp2 == "No" & mapp182 == "Yes" ~ 'Midwest non-rural-No-Yes',
+    stratum_5_categories == "Northeast non-rural" & teach_hosp2 == "No" & mapp182 == "Yes" ~ 'Northeast non-rural-No-Yes',
+    stratum_5_categories == "South non-rural" & teach_hosp2 == "No" & mapp182 == "Yes" ~ 'South non-rural-No-Yes',
+    stratum_5_categories == "West non-rural" & teach_hosp2 == "No" & mapp182 == "Yes" ~ 'West non-rural-No-Yes',
+    stratum_5_categories == "Rural combined" & teach_hosp2 == "No" & mapp182 == "Yes" ~ 'Rural combined-No-Yes',
+    stratum_5_categories == "Midwest non-rural" & teach_hosp2 == "Yes" & mapp182 == "No" ~ 'Midwest non-rural-Yes-No',
+    stratum_5_categories == "Northeast non-rural" & teach_hosp2 == "Yes" & mapp182 == "No" ~ 'Northeast non-rural-Yes-No',
+    stratum_5_categories == "South non-rural" & teach_hosp2 == "Yes" & mapp182 == "No" ~ 'South non-rural-Yes-No',
+    stratum_5_categories == "West non-rural" & teach_hosp2 == "Yes" & mapp182 == "No" ~ 'West non-rural-Yes-No',
+    stratum_5_categories == "Rural combined" & teach_hosp2 == "Yes" & mapp182 == "No" ~ 'Rural combined-Yes-No',
+    stratum_5_categories == "Midwest non-rural" & teach_hosp2 == "No" & mapp182 == "No" ~ 'Midwest non-rural-No-No',
+    stratum_5_categories == "Northeast non-rural" & teach_hosp2 == "No" & mapp182 == "No" ~ 'Northeast non-rural-No-No',
+    stratum_5_categories == "South non-rural" & teach_hosp2 == "No" & mapp182 == "No" ~ 'South non-rural-No-No',
+    stratum_5_categories == "West non-rural" & teach_hosp2 == "No" & mapp182 == "No" ~ 'West non-rural-No-No',
+    stratum_5_categories == "Rural combined" & teach_hosp2 == "No" & mapp182 == "No" ~ 'Rural combined-No-No',
+    TRUE ~ "Midwest non-rural-No-No"  # This line assigns NA to all other cases
+  ))
+#dat5$control_totals <- as.factor(dat5$control_totals)
+```
+
+
+```{r, warning=FALSE}
+#replacing the frequencies to control totals
+
+# Adding a new row to the dataframe
+# If 'control_totals' is not the first column, adjust the position accordingly
+
+new_row <- data.frame(matrix(ncol = 20, nrow = 1)) # Create a new row with 20 columns
+colnames(new_row) <- colnames(dat5x) # Make sure column names match
+new_row$control_totals <- "Midwest non-rural-Yes-Yes" # Assign the specific value to 'control_totals'
+
+dat5x <- rbind(dat5x, new_row) # Append the new row to dat5x
+
+# Check for missing values in 'control_totals' after adding the new row
+#print(sum(is.na(dat5x$control_totals)))
+
+# View the last few rows to confirm the addition
+#tail(dat5x)
+```
+
+
+```{r, warning=FALSE}
+# Sample from 'Midwest non-rural-Yes-Yes' to reduce to 18 instances
+midwest_sample <- dat5x %>%
+  dplyr::filter(control_totals == "Midwest non-rural-Yes-Yes") %>%
+  sample_n(18, replace = T)
+
+# Sample from 'Northeast non-rural-Yes-Yes' to reduce to 12 instances
+northeast_sample <- dat5x %>% 
+  filter(control_totals == "Northeast non-rural-Yes-Yes") %>% 
+  sample_n(12, replace = T)
+
+# Sample from "South non-rural-Yes-Yes" to reduce to 12 instances
+south_sample <- dat5x %>%
+ filter(control_totals == "South non-rural-Yes-Yes") %>%
+ sample_n(23, replace = T)
+ 
+# Sample from "West non-rural-Yes-Yes" to reduce to 12 instances
+west_sample <- dat5x %>%
+   filter(control_totals == "West non-rural-Yes-Yes") %>%
+   sample_n(35, replace = T)
+ 
+# Sample from "Rural combined-Yes-Yes" to reduce to 12 instances
+rural_sample <- dat5x %>%
+  filter(control_totals == "Rural combined-Yes-Yes") %>%
+  sample_n(70, replace = T)
+
+# Sample from "Midwest non-rural-No-Yes" to reduce to 12 instances
+  midwest_no_sample <- dat5x %>%
+  filter(control_totals == "Midwest non-rural-No-Yes") %>%
+  sample_n(183, replace = T)
+
+# Sample from "Northeast non-rural-No-Yes" to reduce to 12 instances
+  northeast_no_sample <- dat5x %>%
+    filter(control_totals == "Northeast non-rural-No-Yes") %>%
+    sample_n(27, replace = T)
+
+# Sample from "South non-rural-No-Yes" to reduce to 12 instances
+  south_no_sample <- dat5x %>%
+  filter(control_totals == "South non-rural-No-Yes") %>%
+  sample_n(123, replace = T)
+
+# Sample from "West non-rural-No-Yes" to reduce to 12 instances
+  west_no_sample <- dat5x %>%
+    filter(control_totals == "West non-rural-No-Yes") %>%
+      sample_n(90, replace = T)
+
+# Sample from "Rural combined-No-Yes" to reduce to 12 instances
+  rural_no_sample <- dat5x %>%
+  filter(control_totals == "Rural combined-No-Yes") %>%
+  sample_n(757, replace = T)
+  
+# Sample from "Midwest non-rural-Yes-No" to reduce to 12 instances
+  midwest_yes_sample <- dat5x %>%
+  filter(control_totals == "Midwest non-rural-Yes-No") %>%
+  sample_n(400, replace = T)
+
+# Sample from "Northeast non-rural-Yes-No" to reduce to 12 instances
+ northeast_yes_sample <- dat5x %>%
+ filter(control_totals == "Northeast non-rural-Yes-No") %>%
+ sample_n(338, replace = T)
+ 
+# Sample from "South non-rural-Yes-No" to reduce to 12 instances
+ south_yes_sample <- dat5x %>%
+ filter(control_totals == "South non-rural-Yes-No") %>%
+ sample_n(597, replace = T)
+ 
+# Sample from "West non-rural-Yes-No" to reduce to 12 instances
+ west_yes_sample <- dat5x %>%
+   filter(control_totals == "West non-rural-Yes-No") %>%
+   sample_n(370, replace = T)
+ 
+# Sample from "Rural combined-Yes-No" to reduce to 12 instances
+  rural_yes_sample <- dat5x %>%
+  filter(control_totals == "Rural combined-Yes-No") %>%
+  sample_n(42, replace = T)
+  
+# Sample from "Midwest non-rural-No-No" to reduce to 12 instances
+midwest_no_no_sample <- dat5x %>%
+  dplyr::filter(control_totals == "Midwest non-rural-No-No") %>%
+  sample_n(407, replace = T)
+
+# Sample from "Northeast non-rural-No-No" to reduce to 12 instances
+  northeast_no_no_sample <- dat5x %>%
+    filter(control_totals == "Northeast non-rural-No-No") %>%
+    sample_n(97, replace = T)
+
+# sample from "South non-rural-No-No" to reduce to 12 instances
+  south_no_no_sample <- dat5x %>%
+  filter(control_totals == "South non-rural-No-No") %>%
+  sample_n(347, replace = T)
+  
+# sample from "West non-rural-No-No" to reduce to 12 instances
+  west_no_no_sample <- dat5x %>%
+    filter(control_totals == "West non-rural-No-No") %>%
+      sample_n(209, replace = T)
+
+# Sample from "Rural combined-No-No" to reduce to 12 instances
+  rural_no_no_sample <- dat5x %>%
+  filter(control_totals == "Rural combined-No-No") %>%
+  sample_n(176, replace = T)  
+
+
+
+# Bind the rest of the data that does not need to change
+rest_of_data <- dat5x %>% 
+  filter(!(control_totals %in% c("Midwest non-rural-Yes-Yes", "Northeast non-rural-Yes-Yes", "South non-rural-Yes-Yes", "West non-rural-Yes-Yes", "Rural combined-Yes-Yes", "Midwest non-rural-No-Yes", "Northeast non-rural-No-Yes", "South non-rural-No-Yes", "West non-rural-No-Yes", "Rural combined-No-Yes", "Midwest non-rural-Yes-No", "Northeast non-rural-Yes-No", "South non-rural-Yes-No", "West non-rural-Yes-No", "Rural combined-Yes-No", "Midwest non-rural-No-No", "Northeast non-rural-No-No", "South non-rural-No-No", "West non-rural-No-No", "Rural combined-No-No")))
+
+# Combine all parts back into a single dataframe
+dat6x <- bind_rows(midwest_sample, northeast_sample, rest_of_data, south_sample, west_sample, rural_sample, midwest_no_sample, northeast_no_sample, south_no_sample, west_no_sample, rural_no_sample, midwest_yes_sample, northeast_yes_sample, south_yes_sample, west_yes_sample, rural_yes_sample, midwest_no_no_sample, northeast_no_no_sample, south_no_no_sample, west_no_no_sample, rural_no_no_sample)
+
+# Verify the changes
+as.data.frame(print(table(dat6x$control_totals)))
+```
+
+
+
+```{r, warning=FALSE}
+#taking only the completed cases
+dat7x <- dat6x %>% 
+          filter(complete.cases(.))
+    
+```
+
+
+```{r, warning=FALSE}
+#*Post Stratification**
+
+#Creating a survey design object
+design <- svydesign(ids = ~sample_id, weights = ~raw_adjusted_weight, data = dat4x)
+```
+
+```{r, warning=FALSE}
+#Pop totals
+nps <- xtabs(~stratum_5_categories + teach_hosp2 + mapp182, data = dat7x)
+#as.data.frame(nps)
+```
+
+```{r, warning=FALSE}
+#postratification
+calibrated_design <- postStratify(design,
+                                  strata = ~stratum_5_categories + teach_hosp2 + mapp182,
+                                  population = nps)
+```
+
+```{r, warning=FALSE}
+summary(calibrated_design)
+```
+
+```{r, warning=FALSE}
+svytotal(~interaction(stratum_5_categories, teach_hosp2, mapp182), calibrated_design)
+```
+
+```{r}
+dat4x$calibrated_weights <- weights(calibrated_design)
+
+```
+
+**Descriptives of weights for the overall database of RESPONDENTS only AFTER CALIBRATION**
+```{r, warning=FALSE}
+des_overall_calib <- survey::svydesign(ids=~sample_id, weights = ~ calibrated_weights, strata = ~stratum_5_categories,  data=dat4x, nest = T) %>% 
+  tbl_svysummary(#by= "stratum_5_categories",
+    include = c(base_weight, nonresponse_weight, raw_adjusted_weight), 
+                 type = list(base_weight ~ "continuous", 
+                             nonresponse_weight ~ "continuous",
+                             raw_adjusted_weight ~ "continuous"),
+                 percent = "column",
+                 statistic = list(all_continuous() ~ "{min}, {mean}, {median}, ({p1}, {p5}, {p10}, {p90}, {p95}, {p99}), {max}",
+                            all_categorical() ~ "{p}"),
+                 digits = list(all_continuous() ~ c(1,1),
+                               all_categorical() ~ 1),
+                 missing = "no")%>%
+  modify_header(all_stat_cols() ~ "{level} ({style_percent(p)}%)") %>%
+  #add_p() %>%
+  #bold_p() %>% 
+  #add_overall() %>% 
+  bold_labels() %>% 
+  italicize_levels() %>% 
+  as_flex_table()
+
+des_overall_calib
+```
+
+
+**Descriptives of weights by stratum of RESPONDENTS only AFTER CALIBRATION**
+```{r}
+#descriptives of the weights by each stratum
+des_st_calib <- 
+ survey::svydesign(ids=~sample_id, weights = ~ calibrated_weights, strata = ~stratum_5_categories,  data=dat4x, nest = T) %>% 
+  tbl_svysummary(by= "stratum_5_categories",
+    include = c(base_weight, nonresponse_weight, raw_adjusted_weight), 
+                 type = list(base_weight ~ "continuous", 
+                             nonresponse_weight ~ "continuous",
+                             raw_adjusted_weight ~ "continuous"),
+                 percent = "column",
+                 statistic = list(all_continuous() ~ "{min}, {mean}, {median}, ({p1}, {p5}, {p10}, {p90}, {p95}, {p99}), {max}",
+                            all_categorical() ~ "{p}"),
+                 digits = list(all_continuous() ~ c(1,1),
+                               all_categorical() ~ 1),
+                 missing = "no")%>%
+  #modify_header(all_stat_cols() ~ "{level} ({style_percent(p)}%)") %>%
+  modify_header(update = list(label ~ "",
+                              stat_1 ~ "**Midwest non-rural** (n = 125)",
+                              stat_2 ~ "**Northeast non-rural** (n = 73)",
+                              stat_3 ~ "**Rural combined** (n = 163)",
+                              stat_4 ~ "**South non-rural** (n = 139)",
+                              stat_5 ~ "**West non-rural** (n = 106)"
+                              ))%>%
+  modify_spanning_header(starts_with("stat_") ~ "For overall") %>%
+  #add_p() %>%
+  #bold_p() %>% 
+  #add_overall() %>% 
+  bold_labels() %>% 
+  italicize_levels() %>% 
+  as_flex_table()
+
+des_st_calib
+```
+
+
+**Histogram for the weights AFTER CALIBRATION**
+```{r, warning=FALSE}
+par(mfrow=c(1,3))
+hist(dat4x$base_weight, main="Base weight", weights=dat4x$calibrated_weights)
+hist(dat7x$nonresponse_weight, main="Nonresponse weight", weights=dat4x$calibrated_weights)
+hist(dat7x$raw_adjusted_weight, main="Raw adjusted weight", weights=dat4x$calibrated_weights)
+```
+<br>
+**Boxplot for the weights AFTER CALIBRATION**
+```{r, warning=FALSE}
+par(mfrow=c(1,3))
+boxplot(dat7x$base_weight, main="Base weight", weights=dat4x$calibrated_weights)
+Boxplot(dat7x$nonresponse_weight, main="Nonresponse weight", weights=dat4x$calibrated_weights)
+Boxplot(dat7x$raw_adjusted_weight, main="Raw adjusted weight", weights=dat4x$calibrated_weights)
+```
+
+
+**Variance of inflation AFTER CALIBRATION**
+```{r, warning=FALSE}
+#computing 1+L for overall data using raw adj weight for respondents only
+vif_c1 <- dat4x %>%
+    summarise(
+    mu = mean(calibrated_weights),
+    std = sd(calibrated_weights),
+    cv = std / mu,
+    var_inflation = 1 + cv^2
+  )
+
+library(knitr)
+knitr::kable(vif_c1, format = "markdown", caption = "1+L for overall data")
+```
+
+```{r, warning=FALSE}
+#Grouping the data by stratum for responents only
+vif2 <- dat4x %>%
+  group_by(stratum_5_categories) %>%
+  summarise(
+    mu1 = mean(calibrated_weights),
+    std1 = sd(calibrated_weights),
+    cv1 = std1 / mu1,
+    var_inflation1 = 1 + cv1^2
+  )
+
+kable(vif2, caption = "1+L by stratum")
+```
+
+
+
+**Sum of weights AFTER CALIBRATION**
+```{r, warning=FALSE}
+sum(dat4x$base_weight)
+sum(dat7x$nonresponse_weight)
+```
+
+```{r, warning=FALSE}
+#sum of raw adj weight before calibration
+sum(dat4x$raw_adjusted_weight)
+
+#sum of raw adj weight after calibration
+sum(dat7x$raw_adjusted_weight)
+
+
+sum(weights(design))
+sum(weights(calibrated_design))
+```
+
+**Number of respondents for the 20 classes BEFORE CALIBRATION**
+```{r, warning=FALSE}
+library(flextable)
+# Original data summarization with interaction variable
+summary_table <- dat4x %>%
+  mutate(interaction_var = interaction(teach_hosp2, mapp182)) %>%
+  group_by(stratum_5_categories, interaction_var) %>%
+  summarise(count = n(), .groups = 'drop')
+
+# Calculate row totals
+row_totals <- summary_table %>%
+  group_by(stratum_5_categories) %>%
+  summarise(count = sum(count)) %>%
+  mutate(interaction_var = "Total")
+
+# Append row totals to the summary
+summary_with_row_totals <- bind_rows(summary_table, row_totals)
+
+# Pivot to wide format including row totals
+wide_table_with_row_totals <- summary_with_row_totals %>%
+  pivot_wider(names_from = interaction_var, values_from = count, values_fill = list(count = 0))
+
+# Calculate column totals (this includes the previously calculated row totals as part of the calculation)
+column_totals <- wide_table_with_row_totals %>%
+  summarise(across(-stratum_5_categories, sum, na.rm = TRUE)) %>%
+  mutate(stratum_5_categories = "Total")
+
+# Combine wide table with column totals
+final_table_with_column_totals <- bind_rows(wide_table_with_row_totals, column_totals)
+
+ft <- flextable(final_table_with_column_totals) %>%
+  set_table_properties(width = .5, layout = "autofit") %>%
+  align(align = "center", part = "all") %>%
+  set_header_labels(
+    `stratum_5_categories` = "Stratum",
+    `No.Yes` = "Teaching Hospital=N x Critical Access Hospital=Y",
+    `Yes.No` = "Teaching Hospital=Y  x Critical Access Hospital=N",
+    `No.No` = "Teaching Hospital=N x Critical Access Hospital=N",
+    `Yes.Yes` = "Teaching Hospital=Y x Critical Access Hospital=Y",
+    `Total` = "Total"
+  ) %>%
+  set_caption("Crosstable for Teaching and Critical hospitals by Stratum")
+
+ft
+
+```
+
+**Number of respondents for the 20 classes AFTER CALIBRATION**
+```{r, warning=FALSE}
+library(flextable)
+# Original data summarization with interaction variable
+summary_table1 <- dat7x %>%
+  mutate(interaction_var = interaction(teach_hosp2, mapp182)) %>%
+  group_by(stratum_5_categories, interaction_var) %>%
+  summarise(count = n(), .groups = 'drop')
+
+# Calculate row totals
+row_totals1 <- summary_table1 %>%
+  group_by(stratum_5_categories) %>%
+  summarise(count = sum(count)) %>%
+  mutate(interaction_var = "Total")
+
+# Append row totals to the summary
+summary_with_row_totals1 <- bind_rows(summary_table1, row_totals1)
+
+# Pivot to wide format including row totals
+wide_table_with_row_totals1 <- summary_with_row_totals1 %>%
+  pivot_wider(names_from = interaction_var, values_from = count, values_fill = list(count = 0))
+
+# Calculate column totals (this includes the previously calculated row totals as part of the calculation)
+column_totals1 <- wide_table_with_row_totals1 %>%
+  summarise(across(-stratum_5_categories, sum, na.rm = TRUE)) %>%
+  mutate(stratum_5_categories = "Total")
+
+# Combine wide table with column totals
+final_table_with_column_totals1 <- bind_rows(wide_table_with_row_totals1, column_totals1)
+
+ft1 <- flextable(final_table_with_column_totals1) %>%
+  set_table_properties(width = .5, layout = "autofit") %>%
+  align(align = "center", part = "all") %>%
+  set_header_labels(
+    `stratum_5_categories` = "Stratum",
+    `No.Yes` = "Teaching Hospital=N x Critical Access Hospital=Y",
+    `Yes.No` = "Teaching Hospital=Y  x Critical Access Hospital=N",
+    `No.No` = "Teaching Hospital=N x Critical Access Hospital=N",
+    `Yes.Yes` = "Teaching Hospital=Y x Critical Access Hospital=Y",
+    `Total` = "Total"
+  ) %>%
+  set_caption("Crosstable for Teaching and Critical hospitals by Stratum after Calibration")
+
+ft1
+
+```
+
+
+
+
+##########################################################################
+# *CREATING 13 UNIQUE STRATA*
+##########################################################################
+**13 unique strata for sample**
+
+```{r, warning=FALSE}
+dat4x$midwest_non_rural_CA <- factor(
+  ifelse(dat4x$stratum_5_categories=="Midwest non-rural" & dat4x$mapp182=="Yes", "Yes", "No"))
+
+dat4x$rural_combined_CA <- factor(
+  ifelse(dat4x$stratum_5_categories=="Rural combined" & dat4x$mapp182=="Yes", "Yes", "No"))
+
+dat4x$west_non_rural_CA <- factor(
+  ifelse(dat4x$stratum_5_categories=="West non-rural" & dat4x$mapp182=="Yes", "Yes", "No"))
+
+dat4x$eastcoast_non_rural <- factor(
+  ifelse(dat4x$stratum_5_categories=="Northeast non-rural" & dat4x$mapp182=="Yes", "Yes",
+  ifelse(dat4x$stratum_5_categories=="South non-rural" & dat4x$mapp182=="Yes", "Yes", "No")))
+
+dat4x$midwest_non_rural_TH <- factor(
+  ifelse(dat4x$stratum_5_categories=="Midwest non-rural" & dat4x$mapp182=="No" & dat4x$teach_hosp2=="Yes", "Yes", "No"))
+
+dat4x$northeast_non_rural_TH <- factor(
+  ifelse(dat4x$stratum_5_categories=="Northeast non-rural" & dat4x$mapp182=="No" & dat4x$teach_hosp2=="Yes", "Yes", "No"))
+
+dat4x$south_non_rural_TH <- factor(
+  ifelse(dat4x$stratum_5_categories=="South non-rural" & dat4x$mapp182=="No" & dat4x$teach_hosp2=="Yes", "Yes", "No"))
+
+dat4x$west_non_rural_TH <- factor(
+  ifelse(dat4x$stratum_5_categories=="West non-rural" & dat4x$mapp182=="No" & dat4x$teach_hosp2=="Yes", "Yes", "No"))
+
+dat4x$midwest_non_rural <- factor(
+  ifelse(dat4x$stratum_5_categories=="Midwest non-rural" & dat4x$mapp182=="No" & dat4x$teach_hosp2=="No", "Yes", "No"))
+
+dat4x$northeast_non_rural <- factor(
+  ifelse(dat4x$stratum_5_categories=="Northeast non-rural" & dat4x$mapp182=="No" & dat4x$teach_hosp2=="No", "Yes", "No"))
+
+dat4x$south_non_rural <- factor(
+  ifelse(dat4x$stratum_5_categories=="South non-rural" & dat4x$mapp182=="No" & dat4x$teach_hosp2=="No", "Yes", "No"))
+
+dat4x$west_non_rural <- factor(
+  ifelse(dat4x$stratum_5_categories=="West non-rural" & dat4x$mapp182=="No" & dat4x$teach_hosp2=="No", "Yes", "No"))
+
+dat4x$rural_combined <- factor(
+  ifelse(dat4x$stratum_5_categories=="Rural combined" & dat4x$teach_hosp2 == "Yes" & dat4x$mapp182=="No", "Yes",
+  ifelse(dat4x$stratum_5_categories=="Rural combined" & dat4x$teach_hosp2 == "No" & dat4x$mapp182=="No", "Yes", "No")))
+```
+
+```{r, warning=FALSE}
+dat4x <- dat4x %>%
+        mutate(control_totals = case_when(
+                                    dat4x$midwest_non_rural_CA == "Yes" ~ "Midwest non-rural_CA=Y",
+                                    dat4x$rural_combined_CA == "Yes" ~ "Rural combined_CA=Y",
+                                    dat4x$west_non_rural_CA == "Yes" ~ "West non-rural_CA=Y", 
+                                    dat4x$eastcoast_non_rural == "Yes" ~ "Eastcoast non-rural_CA=Y",
+                                    dat4x$midwest_non_rural_TH == "Yes" ~ "Midwest_non_rural_TH=Y,CA=N",
+                                    dat4x$northeast_non_rural_TH == "Yes" ~ "Northeast non-rural_CA=N, TH=Y",
+                                    dat4x$south_non_rural_TH == "Yes" ~ "South non-rural_CA=N, TH=Y",
+                                    dat4x$west_non_rural_TH == "Yes" ~ "West non-rural_CA=Y, TH=Y",
+                                    dat4x$midwest_non_rural == "Yes" ~ "Midwest non-rural_CA=N, TH=N",
+                                    dat4x$northeast_non_rural == "Yes" ~ "Northeast non-rural_CA=N, TH=N",
+                                    dat4x$south_non_rural == "Yes" ~ "South non-rural_CA=N, TH=N", 
+                                    dat4x$west_non_rural == "Yes" ~ "West non-rural_CA=N, TH=N", 
+                                    dat4x$rural_combined == "Yes" ~ "Rural combined-Rural not CA",
+                                    TRUE ~ NA))
+```
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+# samp13 <- as.data.frame(table(dat4x$control_totals))
+# 
+# library(knitr)
+# knitr::kable(samp13, format = "markdown")
+```
+
+**13 unique strata for population**
+
+```{r, warning=FALSE}
+#Replace survey sample with population data
+
+midwest_non_rural_CA_sample <- dat4x %>%
+  dplyr::filter(control_totals == "Midwest non-rural_CA=Y") %>%
+  sample_n(201, replace = T)
+
+rural_combined_CA_sample <- dat4x %>%
+  filter(control_totals == "Rural combined_CA=Y") %>%
+  sample_n(827, replace = T)
+ 
+west_non_rural_CA_sample <- dat4x %>%
+   filter(control_totals == "West non-rural_CA=Y") %>%
+   sample_n(125, replace = T)
+ 
+eastcoast_non_rural_CA_sample <- dat4x %>% 
+  filter(control_totals == "Eastcoast non-rural_CA=Y") %>%
+  sample_n(185, replace = T)
+
+midwest_non_rural_TH_sample <- dat4x %>% 
+  filter(control_totals == "Midwest_non_rural_TH=Y,CA=N") %>%
+  sample_n(400, replace = T)
+
+northeast_non_rural_TH_sample <- dat4x %>%
+  filter(control_totals == "Northeast non-rural_CA=N, TH=Y") %>%
+  sample_n(338, replace = T)
+
+south_non_rural_TH_sample <- dat4x %>%
+  filter(control_totals == "South non-rural_CA=N, TH=Y") %>%
+  sample_n(597, replace = T)
+
+west_non_rural_TH_sample <- dat4x %>% 
+  filter(control_totals == "West non-rural_CA=Y, TH=Y") %>%
+  sample_n(370, replace = T)
+
+midwest_non_rural_sample <- dat4x %>% 
+  filter(control_totals == "Midwest non-rural_CA=N, TH=N") %>%
+  sample_n(407, replace = T)
+
+northeast_non_rural_sample <- dat4x %>%
+  filter(control_totals == "Northeast non-rural_CA=N, TH=N") %>%
+  sample_n(97, replace = T)
+
+south_non_rural_sample <- dat4x %>% 
+  filter(control_totals == "South non-rural_CA=N, TH=N") %>%
+  sample_n(347, replace = T)
+
+west_non_rural_sample <- dat4x %>%
+  filter(control_totals == "West non-rural_CA=N, TH=N") %>%
+  sample_n(209, replace = T)
+
+rural_combined_sample <- dat4x %>%
+  filter(control_totals == "Rural combined-Rural not CA") %>%
+  sample_n(218, replace = T)
+
+
+# Bind the rest of the data that does not need to change
+rest_of_data <- dat4x %>% 
+  filter(!(control_totals %in% c("Midwest non-rural_CA=Y", "Rural combined_CA=Y", "West non-rural_CA=Y", "Eastcoast non-rural_CA=Y", "Midwest_non_rural_TH=Y,CA=N", "Northeast non-rural_CA=N, TH=Y", "South non-rural_CA=N, TH=Y", "West non-rural_CA=Y, TH=Y", "Midwest non-rural_CA=N, TH=N", "Northeast non-rural_CA=N, TH=N", "South non-rural_CA=N, TH=N", "West non-rural_CA=N, TH=N", "Rural combined-Rural not CA")))
+
+
+# Combine all parts back into a single dataframe
+dat6x <- bind_rows(midwest_non_rural_CA_sample, rural_combined_CA_sample, west_non_rural_CA_sample, eastcoast_non_rural_CA_sample, midwest_non_rural_TH_sample, northeast_non_rural_TH_sample, south_non_rural_TH_sample, west_non_rural_TH_sample, midwest_non_rural_sample, northeast_non_rural_sample, south_non_rural_sample, west_non_rural_sample, rural_combined_sample, rest_of_data)
+
+# Verify the changes
+#table(dat6x$control_totals)
+```
+
+
+```{r, warning=FALSE, echo=FALSE, results=FALSE}
+# pop13 <- as.data.frame(table(dat6x$control_totals))
+# 
+# knitr::kable(pop13, format = "markdown")
+```
+
+##########################################################################
+# *AFTER CREATING 13 STRATA*
+##########################################################################
+
+
+```{r, warning=FALSE}
+#*Post Stratification**
+design <- svydesign(ids = ~sample_id, weights = ~raw_adjusted_weight, data = dat4x)
+```
+
+```{r, warning=FALSE}
+#Pop totals
+nps <- xtabs(~control_totals + teach_hosp2 + mapp182, data = dat6x)
+#as.data.frame(nps)
+```
+
+```{r, warning=FALSE}
+#postratification
+calibrated_design <- postStratify(design,
+                                  strata = ~control_totals + teach_hosp2 + mapp182,
+                                  population = nps)
+```
+
+```{r, warning=FALSE}
+summary(calibrated_design)
+```
+
+```{r, warning=FALSE}
+svytotal(~interaction(control_totals, teach_hosp2, mapp182), calibrated_design)
+```
+
+*****************
+
+#creating calibrated_weight as a variable
+```{r}
+dat4x$calibrated_weights <- weights(calibrated_design)
+
+```
+**************
+
+**Descriptives of weights for the overall database after creating 13 unique strata** 
+```{r, warning=FALSE}
+des_overall_calib <- survey::svydesign(ids=~sample_id, weights = ~ calibrated_weights, strata = ~stratum_5_categories,  data=dat4x, nest = T) %>% 
+  tbl_svysummary(#by= "stratum_5_categories",
+    include = c(base_weight, nonresponse_weight, raw_adjusted_weight), 
+                 type = list(base_weight ~ "continuous", 
+                             nonresponse_weight ~ "continuous",
+                             raw_adjusted_weight ~ "continuous"),
+                 percent = "column",
+                 statistic = list(all_continuous() ~ "{min}, {mean}, {median}, ({p1}, {p5}, {p10}, {p90}, {p95}, {p99}), {max}",
+                            all_categorical() ~ "{p}"),
+                 digits = list(all_continuous() ~ c(1,1),
+                               all_categorical() ~ 1),
+                 missing = "no")%>%
+  modify_header(all_stat_cols() ~ "{level} ({style_percent(p)}%)") %>%
+  #add_p() %>%
+  #bold_p() %>% 
+  #add_overall() %>% 
+  bold_labels() %>% 
+  italicize_levels() %>% 
+  as_flex_table()
+
+des_overall_calib
+```
+
+
+**Descriptives of weights by 13 strata of RESPONDENTS**
+```{r}
+#descriptives of the weights by each stratum
+des_st_calib <- 
+ survey::svydesign(ids=~sample_id, weights = ~ calibrated_weights, strata = ~stratum_5_categories,  data=dat4x, nest = T) %>% 
+  tbl_svysummary(by= "control_totals",
+    include = c(base_weight, nonresponse_weight, raw_adjusted_weight), 
+                 type = list(base_weight ~ "continuous", 
+                             nonresponse_weight ~ "continuous",
+                             raw_adjusted_weight ~ "continuous"),
+                 percent = "column",
+                 statistic = list(all_continuous() ~ "{min}, {mean}, {median}, ({p1}, {p5}, {p10}, {p90}, {p95}, {p99}), {max}",
+                            all_categorical() ~ "{p}"),
+                 digits = list(all_continuous() ~ c(1,1),
+                               all_categorical() ~ 1),
+                 missing = "no")%>%
+  modify_header(all_stat_cols() ~ "{level} ({style_percent(p)}%)") %>%
+  # modify_header(update = list(label ~ "",
+  #                             stat_1 ~ "**Midwest non-rural** (n = 125)",
+  #                             stat_2 ~ "**Northeast non-rural** (n = 73)",
+  #                             stat_3 ~ "**Rural combined** (n = 163)",
+  #                             stat_4 ~ "**South non-rural** (n = 139)",
+  #                             stat_5 ~ "**West non-rural** (n = 106)"
+  #                             ))%>%
+  modify_spanning_header(starts_with("stat_") ~ "For overall") %>%
+  #add_p() %>%
+  #bold_p() %>% 
+  #add_overall() %>% 
+  bold_labels() %>% 
+  italicize_levels() %>% 
+  as_flex_table()
+
+des_st_calib
+```
+****************
+
+
+**1+L for uncalibrated and calibrated weights**
+
+```{r, warning=FALSE}
+#Grouping the data by stratum for responents only
+vif1_13 <- dat4x %>%
+  group_by(control_totals) %>%
+  summarise(
+    mu1 = mean(raw_adjusted_weight),
+    std1 = sd(raw_adjusted_weight),
+    cv1 = std1 / mu1,
+    var_inflation1 = 1 + cv1^2
+  )
+
+library(knitr)
+kable(vif1_13, caption = "1+L by 13 strata for uncalibrated weight")
+```
+
+```{r, warning=FALSE}
+#Grouping the data by stratum for responents only
+vif1_13w <- dat4x %>%
+  group_by(control_totals) %>%
+  summarise(
+    mu1 = mean(calibrated_weights),
+    std1 = sd(calibrated_weights),
+    cv1 = std1 / mu1,
+    var_inflation1 = 1 + cv1^2
+  )
+
+vif1_13w
+kable(vif1_13w, caption = "1+L by 13 strata for calibrated weight")
+```
+
+**Sum of weights**
+```{r}
+sum(dat6x$base_weight)
+sum(dat6x$nonresponse_weight)
+sum(dat6x$raw_adjusted_weight)
+sum(weights(design))
+sum(weights(calibrated_design))
+```
+
+**Checking for the match of the control totals in each post-stratum**
+```{r}
+#Midwest non-rural_CA=Y
+table(dat6x$midwest_non_rural_CA)
+svytotal(~midwest_non_rural_CA, calibrated_design)
+
+#Rural combined_CA=Y
+table(dat6x$rural_combined_CA)
+svytotal(~rural_combined_CA, calibrated_design)
+
+#West non-rural_CA=Y
+table(dat6x$west_non_rural_CA)
+svytotal(~west_non_rural_CA, calibrated_design)
+
+#Eastcoast non-rural_CA=Y
+table(dat6x$eastcoast_non_rural)
+svytotal(~eastcoast_non_rural, calibrated_design)
+
+#Midwest_non_rural_TH=Y,CA=N
+table(dat6x$midwest_non_rural_TH)
+svytotal(~midwest_non_rural_TH, calibrated_design)
+
+#Northeast non-rural_CA=N, TH=Y
+table(dat6x$northeast_non_rural_TH)
+svytotal(~northeast_non_rural_TH, calibrated_design)
+
+#South non-rural_CA=N, TH=Y
+table(dat6x$south_non_rural_TH)
+svytotal(~south_non_rural_TH, calibrated_design)
+
+#West non-rural_CA=Y, TH=Y
+table(dat6x$west_non_rural_TH)
+svytotal(~west_non_rural_TH, calibrated_design)
+
+#Midwest non-rural_CA=N, TH=N
+table(dat6x$midwest_non_rural)
+svytotal(~midwest_non_rural, calibrated_design)
+
+#Northeast non-rural_CA=N, TH=N
+table(dat6x$northeast_non_rural)
+svytotal(~northeast_non_rural, calibrated_design)
+
+#South non-rural_CA=N, TH=N
+table(dat6x$south_non_rural)
+svytotal(~south_non_rural, calibrated_design)
+
+#West non-rural_CA=N, TH=N
+table(dat6x$west_non_rural)
+svytotal(~west_non_rural, calibrated_design)
+
+#Rural combined-Rural not CA
+table(dat6x$rural_combined)
+svytotal(~rural_combined, calibrated_design)
+```
+Summing up **Yes** for each of the 13 strata gives a total of 4312 which matches the control totals.
+
+
+#merging with original data for checking 1+L
+```{r}
+datnew3 <- merge(datA, dat4x, by="sample_id")
+```
+
+```{r, warning=FALSE}
+#with merged sample data
+
+vif_overall2 <- datnew3 %>%
+    summarise(
+    mu = mean(calibrated_weights),
+    std = sd(calibrated_weights),
+    cv = std / mu,
+    var_inflation = 1 + cv^2
+  )
+vif_overall2
+```
+
+```{r}
+finaldataFeb16 <- dat4x %>% 
+  dplyr::select(sample_id, aha_id, control_totals, base_weight, nonresponse_weight, raw_adjusted_weight, calibrated_weights)
+```
+
+```{r}
+write.csv(finaldataFeb16, "C:/Users/ilmul/Documents/UMICH/RA works/CHOP Nonresponse weights Winter 2024/final dataFeb16.csv", row.names = FALSE)
+```
+
+
+
+
+
+
